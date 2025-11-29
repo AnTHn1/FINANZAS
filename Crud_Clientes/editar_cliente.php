@@ -1,5 +1,7 @@
 <?php
+require_once "../Auth/auth.php"; // protege la página
 include "../conexion.php";
+include("../menu.php");
 
 // ✅ Conexión PDO centralizada
 $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$dbname;", $user, $password, [
@@ -35,8 +37,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             ":id"       => $id
         ]);
 
-        // ✅ Redirigir a index.php después de actualizar
-        header("Location: ../index.php");
+        // ✅ Redirigir a listar_cliente.php después de actualizar
+        header("Location: listar_cliente.php");
         exit;
     } catch (PDOException $e) {
         echo "❌ Error al actualizar: " . $e->getMessage();
@@ -78,4 +80,4 @@ if (!$cliente) {
 </form>
 
 <br>
-<a href="../index.php">⬅️ Volver</a>
+<a href="listar_cliente.php">⬅️ Volver</a>

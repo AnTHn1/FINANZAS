@@ -1,6 +1,7 @@
 <?php
+require_once "../Auth/auth.php"; // protege la página
 include "../conexion.php";
-
+include("../menu.php");
 // Obtener todos los créditos con nombre de cliente
 $stmt = $pdo->query("
     SELECT cr.id, cl.nombre AS cliente, cr.moneda, cr.monto, cr.plazo, cr.tasa, cr.tipo_tasa, cr.periodo_gracia, cr.fecha_inicio

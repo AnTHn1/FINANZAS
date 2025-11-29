@@ -1,5 +1,7 @@
 <?php
+require_once "../Auth/auth.php"; // protege la página
 include "../conexion.php";
+include("../menu.php");
 include "../funciones_financieras.php"; // Tus funciones como cuotaFrances y capitalVivo
 
 // Obtener lista de clientes para el select
