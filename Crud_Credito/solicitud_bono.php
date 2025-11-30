@@ -400,7 +400,7 @@ function actualizarTodo() {
 
     // Total BBP
     const sostenible = sostenibleEl.value === "1";
-    const incentivoSostenible = sostenible ? 10000 : 0;
+    const incentivoSostenible = sostenible ? 6300 : 0;
     const total_bbp = bbp_base + incentivoSostenible;
     totalBbpEl.value = fmt2(total_bbp);
     hidden_total_bbp.value = total_bbp;

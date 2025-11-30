@@ -1,7 +1,11 @@
 <?php
 session_start();
+
+// Destruir toda la sesión
 session_unset();
 session_destroy();
-header("Location: login.php"); // redirige al login
-exit();
+
+// Redirigir al landing page
+header("Location: /FINANZAS/landingpage.php");
+exit;
 ?>

@@ -1,5 +1,4 @@
 <?php
-require_once "Auth/auth.php"; // protege la página
 include "conexion.php";
 include("menu.php");
 ?>

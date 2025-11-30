@@ -1,4 +1,4 @@
-<?php
+<?php 
 session_start();
 require_once "../conexion.php"; // Conexión con PDO
 
@@ -8,74 +8,119 @@ $error = "";
 //   PROCESO DE REGISTRO (Usuario + Cliente vinculado)
 // =====================================================
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
     // Datos de usuario
     $username = trim($_POST["username"]);
     $password = trim($_POST["password"]);
     $rol      = trim($_POST["rol"]);
 
-    // Datos adicionales del cliente
+    // Datos del cliente
     $nombre   = trim($_POST["nombre"]);
     $dni      = trim($_POST["dni"]);
     $ingresos = trim($_POST["ingresos"]);
     $telefono = trim($_POST["telefono"]);
     $correo   = trim($_POST["correo"]);
 
-    // Validar campos
+    // ===========================
+    // VALIDACIONES
+    // ===========================
+
+    // 1️⃣ Campos obligatorios
     if (
         empty($username) || empty($password) || empty($rol) ||
         empty($nombre) || empty($dni) || empty($ingresos) ||
         empty($telefono) || empty($correo)
     ) {
         $error = "⚠️ Todos los campos son obligatorios.";
-    } else {
-        try {
-            // 1️⃣ Encriptar contraseña
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+    }
+    // 2️⃣ username máximo 32 caracteres
+    elseif (strlen($username) > 32) {
+        $error = "⚠️ El nombre de usuario no puede exceder 32 caracteres.";
+    }
+    // 3️⃣ DNI debe ser numérico y exactamente 8 dígitos
+    elseif (!ctype_digit($dni) || strlen($dni) !== 8) {
+        $error = "⚠️ El DNI debe contener exactamente 8 dígitos numéricos.";
+    }
+    // 4️⃣ Teléfono debe ser numérico y exactamente 9
+    elseif (!ctype_digit($telefono) || strlen($telefono) !== 9) {
+        $error = "⚠️ El teléfono debe contener exactamente 9 dígitos numéricos.";
+    }
+    // 5️⃣ Correo válido
+    elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+        $error = "⚠️ Ingrese un correo electrónico válido.";
+    }
 
-            // 2️⃣ Insertar en tabla usuarios
-            $stmt = $pdo->prepare("
-                INSERT INTO usuarios (username, password, rol) 
-                VALUES (:username, :password, :rol)
-                RETURNING id
-            ");
-            $stmt->execute([
-                ':username' => $username,
-                ':password' => $hashedPassword,
-                ':rol'      => $rol
-            ]);
+    // 🚨 SI HAY ERROR, SALIR
+    if (!empty($error)) {
+        goto fin;
+    }
 
-            // Obtener el ID del nuevo usuario
-            $usuario_id = $stmt->fetchColumn();
+    try {
 
-            // 3️⃣ Insertar datos del cliente vinculados al usuario
-            $stmt2 = $pdo->prepare("
-                INSERT INTO clientes (usuario_id, nombre, dni, ingresos, telefono, correo)
-                VALUES (:usuario_id, :nombre, :dni, :ingresos, :telefono, :correo)
-            ");
-            $stmt2->execute([
-                ':usuario_id' => $usuario_id,
-                ':nombre'     => $nombre,
-                ':dni'        => $dni,
-                ':ingresos'   => $ingresos,
-                ':telefono'   => $telefono,
-                ':correo'     => $correo
-            ]);
+        // Encriptar contraseña
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-            // Redirigir al login
-            $_SESSION['mensaje'] = "✅ Usuario registrado correctamente.";
-            header("Location: login.php");
-            exit;
+        // Insertar usuario
+        $stmt = $pdo->prepare("
+            INSERT INTO usuarios (username, password, rol) 
+            VALUES (:username, :password, :rol)
+            RETURNING id
+        ");
+        $stmt->execute([
+            ':username' => $username,
+            ':password' => $hashedPassword,
+            ':rol'      => $rol
+        ]);
 
-        } catch (PDOException $e) {
-            if ($e->getCode() == 23505) { // username duplicado
-                $error = "⚠️ El nombre de usuario ya existe. Elige otro.";
-            } else {
-                $error = "❌ Error en el registro: " . $e->getMessage();
-            }
+        $usuario_id = $stmt->fetchColumn();
+
+        // Insertar cliente
+        $stmt2 = $pdo->prepare("
+            INSERT INTO clientes (usuario_id, nombre, dni, ingresos, telefono, correo)
+            VALUES (:usuario_id, :nombre, :dni, :ingresos, :telefono, :correo)
+        ");
+        $stmt2->execute([
+            ':usuario_id' => $usuario_id,
+            ':nombre'     => $nombre,
+            ':dni'        => $dni,
+            ':ingresos'   => $ingresos,
+            ':telefono'   => $telefono,
+            ':correo'     => $correo
+        ]);
+
+        $_SESSION['mensaje'] = "🎉 Usuario registrado correctamente.";
+        header("Location: login.php");
+        exit;
+
+    } catch (PDOException $e) {
+
+        // DNI duplicado
+        if ($e->getCode() == 23505 && strpos($e->getMessage(), 'clientes_dni') !== false) {
+            $error = "⚠️ El DNI ya está registrado.";
+        }
+        // Username duplicado
+        elseif ($e->getCode() == 23505 && strpos($e->getMessage(), 'usuarios_username') !== false) {
+            $error = "⚠️ El usuario ya existe.";
+        }
+        // Correo duplicado
+        elseif ($e->getCode() == 23505 && strpos($e->getMessage(), 'clientes_correo') !== false) {
+            $error = "⚠️ El correo ya está registrado.";
+        }
+        else {
+            $error = "❌ Error: " . $e->getMessage();
         }
     }
 }
+
+fin:
+$username = $username ?? "";
+$nombre   = $nombre ?? "";
+$dni      = $dni ?? "";
+$ingresos = $ingresos ?? "";
+$telefono = $telefono ?? "";
+$correo   = $correo ?? "";
 ?>
+
 
 <!DOCTYPE html>
 <html lang="es">
@@ -131,54 +176,61 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             text-align: center;
             margin-bottom: 10px;
         }
-        .back {
-            display: block;
-            text-align: center;
-            margin-top: 15px;
-            color: #3498db;
-        }
+.back {
+    display: block;
+    width: fit-content;
+    margin: 15px auto 0;
+    text-align: center;
+}
+
     </style>
 </head>
 <body>
 
-    <h2>📝 Registro de Usuario</h2>
+<h2>📝 Registro de Usuario</h2>
 
-    <?php if (!empty($error)) echo "<div class='error'>$error</div>"; ?>
 
-    <form method="POST">
-        <!-- Datos de usuario -->
-        <label>Usuario:</label>
-        <input type="text" name="username" required>
+<?php if (!empty($error)) echo "<div class='error'>$error</div>"; ?>
 
-        <label>Contraseña:</label>
-        <input type="password" name="password" required>
+<form method="POST">
+<!-- Usuario -->
+<label>Usuario:</label>
+<input type="text" name="username" maxlength="32" 
+       value="<?php echo htmlspecialchars($username); ?>" required>
+
+<label>Contraseña:</label>
+<input type="password" name="password" required>
 
 <label>Rol:</label>
-<input type="text" name="rol" value="cliente" readonly >
+<input type="text" name="rol" value="cliente" readonly>
 
-        <!-- Datos del cliente -->
-        <label>Nombre completo:</label>
-        <input type="text" name="nombre" required>
+<!-- Cliente -->
+<label>Nombre completo:</label>
+<input type="text" name="nombre" 
+       value="<?php echo htmlspecialchars($nombre); ?>" required>
 
-        <label>DNI:</label>
-        <input type="text" name="dni" required>
+<label>DNI (8 dígitos):</label>
+<input type="text" name="dni" minlength="8" maxlength="8"
+       pattern="[0-9]{8}"
+       value="<?php echo htmlspecialchars($dni); ?>" required>
 
-        <label>Ingresos (mensuales):</label>
-        <input type="number" name="ingresos" required>
+<label>Ingresos mensuales:</label>
+<input type="number" name="ingresos" 
+       value="<?php echo htmlspecialchars($ingresos); ?>" required>
 
-        <label>Teléfono:</label>
-        <input type="text" name="telefono" required>
+<label>Teléfono (9 dígitos):</label>
+<input type="text" name="telefono" minlength="9" maxlength="9"
+       pattern="[0-9]{9}"
+       value="<?php echo htmlspecialchars($telefono); ?>" required>
 
-        <label>Correo:</label>
-        <input type="email" name="correo" required>
+<label>Correo:</label>
+<input type="email" name="correo"
+       value="<?php echo htmlspecialchars($correo); ?>" required>
 
-<div style="text-align: center;">
-    <button>
-        Registrar Usuario y Cliente
-    </button>
-</div>
-
-    </form>
+    <div style="text-align: center;">
+        <button>Registrarme</button>
+    </div>
+</form>
 
     <a href="login.php" class="back">⬅️ ¿Ya tienes cuenta? Inicia sesión</a>
 

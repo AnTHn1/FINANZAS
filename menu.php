@@ -10,28 +10,48 @@ if (session_status() === PHP_SESSION_NONE) {
             🏠 MiVivienda
         </a>
 
-        <a href="/FINANZAS/landingpage.php" class="nav-link">Inicio</a>
-        <a href="/FINANZAS/Crud_Viviendas/listar_viviendas.php" class="nav-link">Viviendas</a>
-
-        <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
+        <?php 
+        if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
+            <a href="/FINANZAS/Crud_Viviendas/listar_viviendas.php" class="nav-link">Viviendas</a>
             <a href="/FINANZAS/Crud_Clientes/listar_cliente.php" class="nav-link">Clientes</a>
-            <!--<a href="/FINANZAS/Crud_Credito/credito_cliente.php" class="nav-link">Créditos</a>  -->
             <a href="/FINANZAS/Crud_Credito/listar_solicitudes.php" class="nav-link">Bonos Solicitados</a>
+        <!--<a href="/FINANZAS/Crud_Credito/credito_cliente.php" class="nav-link">Créditos</a>  -->
+        <?php elseif (isset($_SESSION['rol']) && $_SESSION['rol'] === 'cliente'): ?>
+            <a href="/FINANZAS/Crud_Viviendas/listar_viviendas.php" class="nav-link">Viviendas</a>
+            <!-- aquí puedes agregar más links para clientes -->
         <?php endif; ?>
     </div>
 
-    <?php if (isset($_SESSION['usuario_id']) && isset($_SESSION['username'])): ?>
     <div class="nav-right">
-<a href="/FINANZAS/mi_perfil.php" class="user-info" style="cursor:pointer; color:#ffeb3b; text-decoration:none;">
-    <?= htmlspecialchars($_SESSION['username']) ?>
-</a>
-        <a href="/FINANZAS/Auth/logout.php" class="logout-btn">Cerrar sesión</a>
+        <?php if (!isset($_SESSION['usuario_id'])): ?>
+            <a href="/FINANZAS/Auth/login.php" class="login-btn">Iniciar sesión</a>
+        <?php else: ?>
+            <a href="/FINANZAS/mi_perfil.php" class="user-info" style="cursor:pointer; color:#ffeb3b; text-decoration:none;">
+                <?= htmlspecialchars($_SESSION['username']) ?>
+            </a>
+            <a href="/FINANZAS/Auth/logout.php" class="logout-btn">Cerrar sesión</a>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </nav>
 
 <style>
     /* ==== Estilos generales ==== */
+
+    .login-btn {
+    background: #ffcc00;
+    color: #000;
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.login-btn:hover {
+    background: #e6b800;
+    transform: scale(1.05);
+}
+
     body {
         margin: 0;
         font-family: "Segoe UI", Roboto, sans-serif;

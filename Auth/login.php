@@ -10,7 +10,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password = trim($_POST["password"]);
 
     if (empty($username) || empty($password)) {
-        $error = "Todos los campos son obligatorios.";
+        $_SESSION['mensaje'] = "❌ Todos los campos son obligatorios.";
+$_SESSION['tipo'] = "error";
+
     } else {
         // Buscar usuario en la BD
         $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE username = :username");
@@ -33,14 +35,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 }
                 exit;
             } else {
-                $error = "Contraseña incorrecta.";
+                $_SESSION['mensaje'] = "❌ Contraseña incorrecta.";
+$_SESSION['tipo'] = "error";
             }
         } else {
-            $error = "Usuario no encontrado.";
+$_SESSION['mensaje'] = "❌ Usuario no encontrado.";
+$_SESSION['tipo'] = "error";
+
         }
     }
 }
 ?>
+<?php if (isset($_SESSION['mensaje'])): ?>
+<div id="toast" class="toast show <?= ($_SESSION['tipo'] ?? '') ?>">
+    <?= $_SESSION['mensaje']; ?>
+</div>
+<?php unset($_SESSION['mensaje'], $_SESSION['tipo']); endif; ?>
+
 
 <!DOCTYPE html>
 <html lang="es">
@@ -55,18 +66,52 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         button { margin-top:15px; padding:10px; width:100%; background:#3498db; border:none; color:#fff; border-radius:5px; cursor:pointer; }
         button:hover { background:#2980b9; }
         .error { color:red; margin-top:10px; }
-        .back { display:block; margin-top:15px; text-align:center; }
-    </style>
+        .back {
+    display: block;
+    width: fit-content;
+    margin: 15px auto 0;
+    text-align: center;
+}
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #28a745;
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.4s ease;
+    z-index: 9999;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Toast de error (opcional) */
+.toast.error {
+    background: #dc3545;
+}
+
+</style>
 </head>
+
+
 <body>
 
     <h2 style="text-align:center;">🔑 Iniciar Sesión</h2>
+<?php if (isset($_SESSION['mensaje'])): ?>
+<div id="toast" class="toast show">
+    <?php echo $_SESSION['mensaje']; ?>
+</div>
+<?php unset($_SESSION['mensaje']); endif; ?>
 
-    <?php if (!empty($error)) echo "<div class='error'>$error</div>"; ?>
-    <?php if (!empty($_SESSION['mensaje'])) { 
-        echo "<div class='mensaje'>".$_SESSION['mensaje']."</div>"; 
-        unset($_SESSION['mensaje']); 
-    } ?>
 
     <form method="POST" action="">
         <label>Usuario:</label>
@@ -79,6 +124,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </form>
 
     <a href="registrar.php" class="back">¿No tienes cuenta? Regístrate aquí</a>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const toast = document.getElementById("toast");
+    if (toast) {
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(20px)";
+        }, 3000); // se oculta después de 3 segundos
+    }
+});
+</script>
 
 </body>
 </html>
