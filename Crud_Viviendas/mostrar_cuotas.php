@@ -107,14 +107,25 @@ $meses_amortizacion = $plazo_meses - $periodo_gracia;
 if ($meses_amortizacion < 1) $meses_amortizacion = 1;
 
 // ====== FRECUENCIA DE PAGO ======
-$frecuencia = isset($proyeccion['frecuencia']) ? (int)$proyeccion['frecuencia'] : 1; // 1=mensual, 2=bimestral, 3=trimestral
-$meses_por_cuota = $frecuencia;
+// FRECUENCIA DE PAGO: 1=mensual, 2=bimestral, 3=trimestral
+$frecuencia = isset($_POST['frecuencia']) 
+                ? (int)$_POST['frecuencia'] 
+                : (isset($proyeccion['frecuencia']) ? (int)$proyeccion['frecuencia'] : 1);
 
-// TEM ajustada a frecuencia
+// Convertir frecuencia lógica a meses por cuota
+switch($frecuencia) {
+    case 1: $meses_por_cuota = 1; break;   // mensual
+    case 2: $meses_por_cuota = 2; break;   // bimestral
+    case 3: $meses_por_cuota = 3; break;   // trimestral
+    default: $meses_por_cuota = 1; break;  // por seguridad, mensual
+}
+
+
+// COK fijo 5% anual
+$COK_anual = 0.05;
+
+// TEM ajustada a la frecuencia
 $TEM_freq = pow(1 + $TEA, $meses_por_cuota / 12) - 1;
-
-// COK ajustada a frecuencia
-$COK_anual = isset($proyeccion['COK']) ? (float)$proyeccion['COK'] : 0.05; // 5% anual por defecto
 $COK_periodo = pow(1 + $COK_anual, $meses_por_cuota / 12) - 1;
 
 // TEM total incluyendo COK
@@ -122,6 +133,8 @@ $TEM_total = (1 + $TEM_freq) * (1 + $COK_periodo) - 1;
 
 // Cuotas totales según frecuencia
 $cuotas_totales = ceil($meses_amortizacion / $meses_por_cuota);
+
+
 
 // Cuota fija (capital + interés, francés)
 if ($TEM_total > 0) {
@@ -132,67 +145,63 @@ if ($TEM_total > 0) {
 }
 
 // ====== Generar cronograma con frecuencia ======
-$saldo = $monto_financiar;
 $cronograma = [];
+$saldo = $monto_financiar;
 
 for ($mes = 1; $mes <= $plazo_meses; $mes++) {
-
     $saldo_inicial = $saldo;
 
     if ($mes <= $periodo_gracia) {
-        // Periodo de gracia total
+        // Periodo de gracia: los primeros $periodo_gracia meses
+        $pg = 'T';
         $amortizacion = 0.0;
-$interes = 0;
-$amortizacion = 0;
-$pg = 'T';
-
+        $interes = 0.0;
+        $cuota = 0.0;
+        $seguro_desgrav = 0.0;
+        $seguro_inmueble = 0.0;
     } else {
-        // Determinar si este mes toca pagar según frecuencia
-        $mes_pago = ($mes - $periodo_gracia - 1) % $meses_por_cuota == 0;
+        // Todos los meses después del periodo de gracia
+        $pg = 'S';
 
-        if ($mes_pago) {
-            // Intereses por TEM y COK
-            $interes_TEM = $saldo_inicial * $TEM_freq;
-            $interes_COK = $saldo_inicial * $COK_periodo;
-            $interes_total = $interes_TEM + $interes_COK;
+        // Interés y amortización según cuota fija
+        $interes = $saldo * $TEM_total;
+        $amortizacion = $cuota_fija_cap_int - $interes;
+        if ($amortizacion < 0) $amortizacion = 0.0;
 
-            // Amortización
-            $cap_y_int = $cuota_fija_cap_int;
-            $amortizacion = $cap_y_int - $interes_total;
-            if ($amortizacion < 0) $amortizacion = 0.0;
-            $interes = $interes_total;
-            $pg = 'S';
-        } else {
-            // Mes sin pago (entre cuotas)
-$interes = $saldo_inicial * $TEM_total;  
-$amortizacion = 0;
-$pg = 'S'; // se mantiene tu lógica
-
-        }
+        // Seguros y cargos
+        $seguro_desgrav = $saldo * $tasa_desgravamen;
+        $seguro_inmueble = $seguro_inmueble_mensual;
+        $cuota = $amortizacion + $interes + $seguro_desgrav + $seguro_inmueble + $comision + $portes + $gastos_adm;
     }
 
-    $seguro_desgrav = $saldo_inicial * $tasa_desgravamen;
-    $seguro_inmueble = $seguro_inmueble_mensual;
-    $saldo_final = $saldo_inicial - $amortizacion;
-    if ($saldo_final < 0.01) $saldo_final = 0.0;
+// Saldo final
+$saldo_final = $saldo_inicial - $amortizacion;
+if ($saldo_final < 0.01) $saldo_final = 0.0;
 
-    $cuota_mensual = $amortizacion + $interes + $seguro_desgrav + $seguro_inmueble + $comision;
-    $flujo_total = $cuota_mensual + $portes + $gastos_adm;
+// Guardar en cronograma
+$cronograma[] = [
+    'periodo' => $mes,
+    'saldo_inicial' => $saldo_inicial,
+    'pg' => $pg,
+    'amortizacion' => $amortizacion,
+    'interes' => $interes,
+    'seguro_desgrav' => $seguro_desgrav,
+    'seguro_inmueble' => $seguro_inmueble,
+    'saldo_final' => $saldo_final,
+    'cuota_mensual' => $cuota
+];
 
-    $cronograma[] = [
-        'periodo' => $mes,
-        'saldo_inicial' => $saldo_inicial,
-        'pg' => $pg,
-        'amortizacion' => $amortizacion,
-        'interes' => $interes,
-        'seguro_desgrav' => $seguro_desgrav,
-        'seguro_inmueble' => $seguro_inmueble,
-        'saldo_final' => $saldo_final,
-        'cuota_mensual' => $cuota_mensual
-    ];
+// Actualizar saldo
+$saldo = $saldo_final;
 
-    $saldo = $saldo_final;
+// 👉 CORTAR AQUÍ si ya se pagó todo
+if ($saldo <= 0.0) {
+    break; // salir del for, ya no hay nada que calcular
 }
+
+}
+
+
 // --- Guardar cronograma en la tabla 'cuotas' ---
 try {
     // Primero, borrar registros antiguos de esta vivienda/usuario (opcional)
@@ -255,11 +264,13 @@ try {
 function fmt($x) {
     return number_format(round($x + 0.0000001, 2), 2, '.', ',');
 }
+$freq_text = ($frecuencia == 1 ? "Mensual" : ($frecuencia == 2 ? "Bimestral" : "Trimestral"));
 ?>
 
 
 <!DOCTYPE html>
 <html lang="es">
+    
 <head>
     <meta charset="UTF-8">
     <title>Proyección de Cuotas</title>
@@ -294,7 +305,7 @@ function fmt($x) {
        <b>Total BBP aplicado:</b> S/ <?= fmt($total_bbp) ?></p>
 
     <p><b>Monto a financiar:</b> S/ <?= fmt($monto_financiar) ?> &nbsp;|&nbsp;
-       <b>TEA:</b> <?= number_format($TEA * 100, 2) ?>% &nbsp;|&nbsp;
+       <b>TEA:</b> <?= number_format(round($TEA * 100 + 0.000001, 2), 2, '.', '') ?>% &nbsp;|&nbsp;
        <b>Plazo:</b> <?= $plazo_meses ?> meses &nbsp;|&nbsp;
        <b>Periodo de Gracia:</b> <?= $periodo_gracia ?> meses</p>
 
@@ -302,7 +313,8 @@ function fmt($x) {
     <b>Supuestos utilizados:</b> 
     Seguro Desgrav. mensual = <?= ($tasa_desgravamen * 100) ?>%, 
     Seguro inmueble anual = <?= ($tasa_seguro_riesgo_anual * 100) ?>%, 
-    COK (Costo de Oportunidad del Capital) anual = <?= ($COK_anual * 100) ?>%.
+    COK (Costo de Oportunidad del Capital) anual = <?= ($COK_anual * 100) ?>%,
+    Frecuencia de Pago = <?= ($freq_text) ?>.
 </p>
 
 </div>

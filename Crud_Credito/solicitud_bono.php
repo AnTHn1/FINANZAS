@@ -304,7 +304,7 @@ $bbp_base = $bbp_row ? (float)$bbp_row['bono'] : 0.0;
 
 <!-- Frecuencia de pago -->
 <label>Frecuencia de pago:</label>
-<select id="frecuencia_pago" name="frecuencia_pago">
+<select id="frecuencia_pago" name="frecuencia">
     <option value="1" selected>Mensual</option>
     <option value="2">Bimestral</option>
     <option value="3">Trimestral</option>

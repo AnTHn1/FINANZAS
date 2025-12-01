@@ -16,9 +16,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $plazo_meses = $_POST['plazo_meses'] ?? null;
     $periodo_gracia = $_POST['periodo_gracia'] ?? null;
 
-    // TNA fija o se podría calcular según lógica adicional
-    $tna = 0.08; // por ejemplo, 8% anual
+    // Tomar TNA desde el form
+    $tna = isset($_POST['tea']) ? floatval($_POST['tea']) : 0;
     $fecha_solicitud = date('Y-m-d');
+
+    // NUEVOS CAMPOS
+    $frecuencia = $_POST['frecuencia'] ?? 1; // 1=Mensual, 2=Bimestral, 3=Trimestral
+    $COK = $_POST['COK'] ?? 0.05;
+
+    // Guardarlos en SESSION temporal para usarlos luego
+    $_SESSION['ultima_frecuencia'] = $frecuencia;
+    $_SESSION['ultima_COK'] = $COK;
 
     if (!$vivienda_id || !$plazo_meses) {
         echo "⚠️ Datos incompletos.";
@@ -26,16 +34,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO solicitud_bono (usuario_id, vivienda_id, tna, plazo_meses, periodo_gracia, fecha_solicitud)
-                               VALUES (:usuario_id, :vivienda_id, :tna, :plazo_meses, :periodo_gracia, :fecha_solicitud)");
-        $stmt->execute([
-            ':usuario_id' => $usuario_id,
-            ':vivienda_id' => $vivienda_id,
-            ':tna' => $tna,
-            ':plazo_meses' => $plazo_meses,
-            ':periodo_gracia' => $periodo_gracia,
-            ':fecha_solicitud' => $fecha_solicitud
-        ]);
+$stmt = $pdo->prepare("INSERT INTO solicitud_bono (usuario_id, vivienda_id, tna, plazo_meses, periodo_gracia, fecha_solicitud, frecuencia)
+                       VALUES (:usuario_id, :vivienda_id, :tna, :plazo_meses, :periodo_gracia, :fecha_solicitud, :frecuencia)");
+
+$stmt->execute([
+    ':usuario_id' => $usuario_id,
+    ':vivienda_id' => $vivienda_id,
+    ':tna' => $tna,
+    ':plazo_meses' => $plazo_meses,
+    ':periodo_gracia' => $periodo_gracia,
+    ':fecha_solicitud' => $fecha_solicitud,
+    ':frecuencia' => $frecuencia
+]);
 
         header("Location: listar_solicitudes.php");
         exit();
