@@ -193,6 +193,63 @@ $pg = 'S'; // se mantiene tu lógica
 
     $saldo = $saldo_final;
 }
+// --- Guardar cronograma en la tabla 'cuotas' ---
+try {
+    // Primero, borrar registros antiguos de esta vivienda/usuario (opcional)
+    $stmtDel = $pdo->prepare("DELETE FROM cuotas WHERE usuario_id = :usuario_id AND vivienda_id = :vivienda_id");
+    $stmtDel->execute([
+        ':usuario_id' => $usuario_id,
+        ':vivienda_id' => $vivienda_id
+    ]);
+
+    // Preparar insert
+    $stmtInsert = $pdo->prepare("
+        INSERT INTO cuotas (
+            usuario_id, 
+            vivienda_id,
+            periodo, 
+            saldo_inicial, 
+            pg, 
+            amortizacion, 
+            interes, 
+            seguro_desgrav, 
+            seguro_inmueble, 
+            saldo_final, 
+            cuota_mensual
+        ) VALUES (
+            :usuario_id,
+            :vivienda_id,
+            :periodo,
+            :saldo_inicial,
+            :pg,
+            :amortizacion,
+            :interes,
+            :seguro_desgrav,
+            :seguro_inmueble,
+            :saldo_final,
+            :cuota_mensual
+        )
+    ");
+
+    foreach ($cronograma as $row) {
+        $stmtInsert->execute([
+            ':usuario_id' => $usuario_id,
+            ':vivienda_id' => $vivienda_id,
+            ':periodo' => $row['periodo'],
+            ':saldo_inicial' => $row['saldo_inicial'],
+            ':pg' => $row['pg'],
+            ':amortizacion' => $row['amortizacion'],
+            ':interes' => $row['interes'],
+            ':seguro_desgrav' => $row['seguro_desgrav'],
+            ':seguro_inmueble' => $row['seguro_inmueble'],
+            ':saldo_final' => $row['saldo_final'],
+            ':cuota_mensual' => $row['cuota_mensual']
+        ]);
+    }
+
+} catch (PDOException $e) {
+    die("Error al guardar cronograma: " . $e->getMessage());
+}
 
 // Formateo para mostrar
 function fmt($x) {

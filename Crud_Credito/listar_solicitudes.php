@@ -13,7 +13,6 @@ $stmt = $pdo->query("
         c.correo AS cliente_correo,
         v.direccion AS vivienda_direccion,
         v.precio AS vivienda_precio,
-        sb.tna,
         sb.plazo_meses,
         sb.periodo_gracia,
         sb.fecha_solicitud
@@ -139,7 +138,6 @@ $solicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <th>Correo</th>
                     <th>Vivienda</th>
                     <th>Precio Vivienda (S/)</th>
-                    <th>TEA</th>
                     <th>Plazo (meses)</th>
                     <th>Periodo de Gracia</th>
                     <th>Fecha Solicitud</th>
@@ -155,7 +153,6 @@ $solicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <td><?= htmlspecialchars($s['cliente_correo']) ?></td>
                         <td><?= htmlspecialchars($s['vivienda_direccion']) ?></td>
                         <td><?= number_format($s['vivienda_precio'], 2) ?></td>
-                        <td><?= number_format($s['tna'] * 100, 2) ?>%</td>
                         <td><?= $s['plazo_meses'] ?></td>
                         <td><?= $s['periodo_gracia'] ?> meses</td>
                         <td><?= htmlspecialchars($s['fecha_solicitud']) ?></td>
