@@ -266,8 +266,8 @@ $bbp_base = $bbp_row ? (float)$bbp_row['bono'] : 0.0;
             <!-- Vivienda sostenible -->
             <label>¿La vivienda es sostenible?</label>
             <select id="sostenible" name="sostenible">
-                <option value="1" selected>Sí</option>
-                <option value="0">No</option>
+                <option value="1" >Sí</option>
+                <option value="0" selected >No</option>
             </select>
 
             <!-- Total BBP -->
@@ -299,7 +299,8 @@ $bbp_base = $bbp_row ? (float)$bbp_row['bono'] : 0.0;
 
             <!-- TCEA -->
             <label>TCEA:</label>
-            <input type="text" id="tcea" readonly>
+<input type="text" id="tcea" readonly value="0.00%">
+
 
 <!-- Frecuencia de pago -->
 <label>Frecuencia de pago:</label>
@@ -320,10 +321,10 @@ $bbp_base = $bbp_row ? (float)$bbp_row['bono'] : 0.0;
 </div>
 
 <script>
-    
 document.addEventListener("DOMContentLoaded", function () {
 
-    const valorVivienda = <?= $vivienda['precio']; ?>; 
+    // --- VALIDACIÓN CUOTA (7.5%) ---
+    const valorVivienda = <?= $vivienda['precio']; ?>;
     const cuotaInput = document.getElementById("cuota_inicial");
     const errorMsg = document.getElementById("cuota_error");
 
@@ -342,14 +343,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Validación en tiempo real
-    cuotaInput.addEventListener("input", validarCuota);
+    // Validación en tiempo real (si existe el input)
+    if (cuotaInput) cuotaInput.addEventListener("input", validarCuota);
 
-});
-
-  
-(function(){
-    const toFloat = v => parseFloat(String(v).replace(/,/g, '').replace('%','')) || 0;
+    // --- UTILIDADES Y ELEMENTOS DEL DOM (se obtienen ahora que el DOM está listo) ---
+    const toFloat = v => parseFloat(String(v ?? '').replace(/,/g, '').replace('%','')) || 0;
     const fmt2 = v => Number(v).toFixed(2);
 
     const valorEl = document.getElementById('valor_vivienda');
@@ -374,200 +372,233 @@ document.addEventListener("DOMContentLoaded", function () {
     // NUEVO CONTENIDO 2: nuevos hidden
     const hidden_frecuencia = document.getElementById('hidden_frecuencia');
     const hidden_COK = document.getElementById('hidden_COK');
-    // FIN NUEVO CONTENIDO 2
 
-function actualizarTodo() {
+    // Seguridad: si algún elemento importante no existe, se loguea (ayuda debugging)
+    if (!valorEl) console.warn('No se encontró #valor_vivienda');
+    if (!cuotaInicialEl) console.warn('No se encontró #cuota_inicial');
+    if (!porcentajeEl) console.warn('No se encontró #porcentaje_cuota');
+    if (!tceaEl) console.warn('No se encontró #tcea');
 
-    const valor = toFloat(valorEl.value);
-    const cuota = toFloat(cuotaInicialEl.value);
-    const bbp_base = toFloat(bbpEl.value);
-    let n = parseInt(plazoEl.value) || 0; // plazo original
-    let tea = toFloat(teaEl.value) / 100;
+    // --- FUNCION PRINCIPAL DE ACTUALIZACIÓN ---
+    function actualizarTodo() {
 
-    // === PERIODO DE GRACIA ===
-    let gracia = parseInt(document.getElementById('periodo_gracia').value) || 0;
+        // Inicializar TCEA en 0 por defecto (asegura que siempre haya algo visible)
+        let tcea = 0;
+        if (tceaEl) tceaEl.value = (tcea * 100).toFixed(2) + "%";
+        if (hidden_tcea) hidden_tcea.value = (tcea * 100).toFixed(6);
 
-    // plazo real después de la gracia
-    let n_real = n - gracia;
-    if (n_real < 1) n_real = 1;
+        // Obtener valores (usar toFloat / parseInt seguros)
+        const valor = toFloat(valorEl ? valorEl.value : 0);
+        const cuota = toFloat(cuotaInicialEl ? cuotaInicialEl.value : 0);
+        const bbp_base = toFloat(bbpEl ? bbpEl.value : 0);
+        let n = parseInt(plazoEl ? plazoEl.value : 0) || 0; // plazo original
+        let tea = toFloat(teaEl ? teaEl.value : 0) / 100;
 
-    if(valor <= 0) return;
+        // === PERIODO DE GRACIA ===
+        let gracia = parseInt(document.getElementById('periodo_gracia') ? document.getElementById('periodo_gracia').value : 0) || 0;
 
-    // % cuota inicial
-    const pct = (cuota / valor) * 100;
-    porcentajeEl.value = pct.toFixed(2) + "%";
-    hidden_porcentaje_cuota.value = pct.toFixed(6);
+        // plazo real después de la gracia
+        let n_real = n - gracia;
+        if (n_real < 1) n_real = 1;
 
-    // Total BBP
-    const sostenible = sostenibleEl.value === "1";
-    const incentivoSostenible = sostenible ? 6300 : 0;
-    const total_bbp = bbp_base + incentivoSostenible;
-    totalBbpEl.value = fmt2(total_bbp);
-    hidden_total_bbp.value = total_bbp;
+        // Si no hay valor de vivienda, no seguimos (pero TCEA ya fue inicializada en 0)
+        if (valor <= 0) {
+            // actualizar porcentajes y montos a 0/por defecto
+            if (porcentajeEl) porcentajeEl.value = "0.00%";
+            if (hidden_porcentaje_cuota) hidden_porcentaje_cuota.value = "0";
+            if (totalBbpEl) totalBbpEl.value = "0.00";
+            if (hidden_total_bbp) hidden_total_bbp.value = "0";
+            if (montoFinEl) montoFinEl.value = "0.00";
+            if (hidden_monto_financiar) hidden_monto_financiar.value = "0";
+            if (cuotaMensualEl) cuotaMensualEl.value = "0.00";
+            if (hidden_cuota_mensual) hidden_cuota_mensual.value = "0.00";
+            return;
+        }
 
-    // Monto a financiar
-    let mf = valor - cuota - total_bbp;
-    if (mf < 0) mf = 0;
-    montoFinEl.value = fmt2(mf);
-    hidden_monto_financiar.value = fmt2(mf);
+        // % cuota inicial (evitar NaN)
+        const pct = isFinite(cuota) && valor > 0 ? (cuota / valor) * 100 : 0;
+        if (porcentajeEl) porcentajeEl.value = pct.toFixed(2) + "%";
+        if (hidden_porcentaje_cuota) hidden_porcentaje_cuota.value = pct.toFixed(6);
+        
 
-    // === FRECUENCIA ===
-    let frecuencia = parseInt(document.getElementById('frecuencia_pago').value) || 1;
-    let meses_por_cuota = frecuencia;
+        // Total BBP
+        const sostenible = sostenibleEl && sostenibleEl.value === "1";
+        const incentivoSostenible = sostenible ? 6300 : 0;
+        const total_bbp = bbp_base + incentivoSostenible;
+        if (totalBbpEl) totalBbpEl.value = fmt2(total_bbp);
+        if (hidden_total_bbp) hidden_total_bbp.value = total_bbp;
 
-    // Guardar frecuencia en hidden para que el servidor la reciba con nombre 'frecuencia'
-    hidden_frecuencia.value = frecuencia; // NUEVO CONTENIDO 2
+        // Monto a financiar
+        let mf = valor - cuota - total_bbp;
+        if (mf < 0) mf = 0;
+        if (montoFinEl) montoFinEl.value = fmt2(mf);
+        if (hidden_monto_financiar) hidden_monto_financiar.value = fmt2(mf);
 
-    // Cuotas totales según frecuencia con plazo REAL
-    let n_cuotas = Math.ceil(n_real / meses_por_cuota);
+        // === FRECUENCIA ===
+        let frecuencia = parseInt(document.getElementById('frecuencia_pago') ? document.getElementById('frecuencia_pago').value : 1) || 1;
+        let meses_por_cuota = frecuencia;
 
-    // === CALCULAR TEM REAL ===
-    // TEM = (1 + TEA)^(1/12) - 1
-    let tem = tea > 0 ? Math.pow(1 + tea, 1/12) - 1 : 0;
+        // Guardar frecuencia en hidden para que el servidor la reciba con nombre 'frecuencia'
+        if (hidden_frecuencia) hidden_frecuencia.value = frecuencia;
 
-    // === TASA POR PERIODO SEGÚN FRECUENCIA ===
-    // Si es mensual → 1 mes
-    // Si es bimestral → TEM compuesto 2 meses
-    // Si es trimestral → TEM compuesto 3 meses
-    let i_freq = Math.pow(1 + tem, meses_por_cuota) - 1;
+        // Cuotas totales según frecuencia con plazo REAL
+        let n_cuotas = Math.ceil(n_real / meses_por_cuota);
 
-    // === CALCULAR CUOTA ===
-    let cuota_mensual = 0;
-    if (mf > 0 && n_cuotas > 0 && i_freq > 0) {
-        cuota_mensual = mf * (i_freq / (1 - Math.pow(1 + i_freq, -n_cuotas)));
+        // === CALCULAR TEM REAL ===
+        // TEM = (1 + TEA)^(1/12) - 1
+        let tem = tea > 0 ? Math.pow(1 + tea, 1/12) - 1 : 0;
+
+        // === TASA POR PERIODO SEGÚN FRECUENCIA ===
+        let i_freq = Math.pow(1 + tem, meses_por_cuota) - 1;
+
+        // === CALCULAR CUOTA ===
+        let cuota_mensual = 0;
+        if (mf > 0 && n_cuotas > 0 && i_freq > 0) {
+            // proteger contra errores de pow con exponentes grandes/negativos
+            const denom = 1 - Math.pow(1 + i_freq, -n_cuotas);
+            if (denom !== 0) {
+                cuota_mensual = mf * (i_freq / denom);
+            } else {
+                cuota_mensual = 0;
+            }
+        }
+
+        if (cuotaMensualEl) cuotaMensualEl.value = fmt2(cuota_mensual);
+        if (hidden_cuota_mensual) hidden_cuota_mensual.value = fmt2(cuota_mensual);
+
+        // === CALCULAR TCEA ===
+        tcea = 0;
+        if (mf > 0 && n_real > 0 && n_cuotas > 0 && cuota_mensual > 0) {
+
+            // seguros ajustados por frecuencia
+            let seg_des = mf * 0.0004 * meses_por_cuota;
+            let seg_riesgo = (mf * 0.003 / 12) * meses_por_cuota;
+
+            let costos_mensuales = cuota_mensual + seg_des + seg_riesgo;
+            let costo_total = (costos_mensuales * n_cuotas) - mf;
+
+            // prevenir división por cero
+            if (mf !== 0 && n_real !== 0) {
+                // proteger contra valores negativos dentro de Math.pow si costo_total/mf < -1
+                let base = 1 + (costo_total / mf);
+                if (base > 0) {
+                    tcea = Math.pow(base, 12 / n_real) - 1;
+                } else {
+                    tcea = 0;
+                }
+            }
+        }
+
+        // actualizar textbox y hidden TCEA
+        if (tceaEl) tceaEl.value = (tcea * 100).toFixed(3) + "%";
+        if (hidden_tcea) hidden_tcea.value = (tcea * 100).toFixed(6);
+
+        // NUEVO CONTENIDO 2: actualizar valor de COK en hidden por si lo cambias mas adelante
+        if (hidden_COK) hidden_COK.value = hidden_COK.value || "0.05";
+
+        // DEBUG opcional: descomentar para ver valores en consola
+        // console.log({valor, cuota, pct, total_bbp, mf, n, gracia, n_real, n_cuotas, tem, i_freq, cuota_mensual, tcea});
     }
 
-    cuotaMensualEl.value = fmt2(cuota_mensual);
-    hidden_cuota_mensual.value = fmt2(cuota_mensual);
-
-    // === CALCULAR TCEA ===
-    let tcea = 0;
-    if (cuota_mensual > 0) {
-
-        // seguros ajustados por frecuencia
-        let seg_des = mf * 0.0004 * meses_por_cuota;
-        let seg_riesgo = (mf * 0.003 / 12) * meses_por_cuota;
-
-        let costos_mensuales = cuota_mensual + seg_des + seg_riesgo;
-        let costo_total = (costos_mensuales * n_cuotas) - mf;
-
-        // usar plazo REAL (n_real) para la TCEA
-        tcea = Math.pow(1 + (costo_total / mf), 12 / n_real) - 1;
-    }
-
-    tceaEl.value = (tcea * 100).toFixed(3) + "%";
-    hidden_tcea.value = (tcea * 100).toFixed(6);
-
-    // NUEVO CONTENIDO 2: actualizar valor de COK en hidden por si lo cambias mas adelante
-    hidden_COK.value = hidden_COK.value || "0.05";
-    // FIN NUEVO CONTENIDO 2
-}
-
-// EVENTOS
-['input','change'].forEach(ev=>{
-    cuotaInicialEl.addEventListener(ev, actualizarTodo);
-    sostenibleEl.addEventListener(ev, actualizarTodo);
-    teaEl.addEventListener(ev, actualizarTodo);
-    plazoEl.addEventListener(ev, actualizarTodo);
-    document.getElementById('frecuencia_pago').addEventListener(ev, actualizarTodo);
-});
-
-[valorEl, cuotaInicialEl, bbpEl, sostenibleEl, teaEl, plazoEl].forEach(el => {
-    el.addEventListener('input', actualizarTodo);
-    el.addEventListener('change', actualizarTodo);
-});
-
-document.getElementById('frecuencia_pago').addEventListener('change', actualizarTodo);
-
-window.addEventListener('DOMContentLoaded', actualizarTodo);
-
-
-
-
-
-(function(){
-    const form = document.getElementById('form-bono');
-    const btn = form.querySelector('button[type="submit"]');
-    const cuotaError = document.getElementById('cuota_error');
-    const cuotaInput = document.getElementById('cuota_inicial');
-
-    form.addEventListener('submit', async function(e){
-        e.preventDefault(); // evita envío normal
-
-        // Ejecutar una vez más el cálculo para asegurar hidden actualizados
-        try {
-            actualizarTodo(); // NUEVO CONTENIDO 2: forzar actualización antes de enviar
-        } catch (err) {
-            console.warn('Error al forzar actualizar:', err);
-        }
-
-        // Validación mínima: si existe error de cuota, no enviar
-        if (cuotaError && cuotaError.style.display !== 'none') {
-            alert('Corrige la cuota inicial: debe ser al menos el 7.5% del valor de la vivienda.');
-            cuotaInput.focus();
-            return;
-        }
-
-        // Validación: asegurar que monto_financiar y cuota_inicial no estén vacíos
-        const hiddenMf = document.getElementById('hidden_monto_financiar').value;
-        const hiddenCuota = parseFloat(document.getElementById('cuota_inicial').value) || 0;
-        if (hiddenMf === "" || isNaN(parseFloat(hiddenMf))) {
-            alert('El monto a financiar no está calculado. Revisa los datos.');
-            return;
-        }
-        if (hiddenCuota <= 0) {
-            alert('Ingrese una cuota inicial válida.');
-            cuotaInput.focus();
-            return;
-        }
-
-        // Evitar doble envío
-        btn.disabled = true;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = 'Enviando...';
-
-        try {
-            // DEBUG: mostrar FormData para verificar exactamente qué se enviará
-            const formDataForDebug = new FormData(form);
-            // Logear pares clave/valor para debugging (se puede eliminar luego)
-            console.groupCollapsed('DEBUG FormData a enviar');
-            for (let pair of formDataForDebug.entries()) {
-                console.log(pair[0]+ ': ' + pair[1]);
-            }
-            console.groupEnd();
-
-            const resp = await fetch(form.action, {
-                method: 'POST',
-                body: formDataForDebug,
-                credentials: 'same-origin'
-            });
-
-            if (!resp.ok) {
-                // si el servidor devuelve error http
-                const text = await resp.text().catch(()=>null);
-                throw new Error('Error en el servidor. ' + (text ? (' Detalle: '+text) : ''));
-            }
-
-             //si guardar_solicitud_bono.php devuelve JSON con flag exitoso:
-             const json = await resp.json().catch(()=>null);
-             if(json && json.success !== true) throw new Error(json.message || 'No fue posible guardar.');
-
-            // Redirigir a la página que quieres
-            window.location.href = "../Crud_Viviendas/listar_viviendas.php";
-
-        } catch (err) {
-            console.error(err);
-            alert('Error al enviar el formulario: ' + (err.message || 'Intenta nuevamente.'));
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        }
+    // --- ASIGNAR EVENTOS (seguro: solo si existen elementos) ---
+    const eventos = ['input', 'change'];
+    eventos.forEach(ev => {
+        if (cuotaInicialEl) cuotaInicialEl.addEventListener(ev, actualizarTodo);
+        if (sostenibleEl) sostenibleEl.addEventListener(ev, actualizarTodo);
+        if (teaEl) teaEl.addEventListener(ev, actualizarTodo);
+        if (plazoEl) plazoEl.addEventListener(ev, actualizarTodo);
+        const freqEl = document.getElementById('frecuencia_pago');
+        if (freqEl) freqEl.addEventListener(ev, actualizarTodo);
+        if (valorEl) valorEl.addEventListener(ev, actualizarTodo);
+        if (bbpEl) bbpEl.addEventListener(ev, actualizarTodo);
     });
-})();
 
+    // también enganchar explicitamente change del select frecuencia
+    const freqEl2 = document.getElementById('frecuencia_pago');
+    if (freqEl2) freqEl2.addEventListener('change', actualizarTodo);
 
-})();
+    // Ejecutar una vez al inicio para fijar 0.00 y calcular con valores presentes
+    actualizarTodo();
 
+    // --- HANDLER DEL FORMULARIO (mantengo tu lógica) ---
+    (function(){
+        const form = document.getElementById('form-bono');
+        if (!form) return;
+        const btn = form.querySelector('button[type="submit"]');
+        const cuotaError = document.getElementById('cuota_error');
+        const cuotaInputLocal = document.getElementById('cuota_inicial');
+
+        form.addEventListener('submit', async function(e){
+            e.preventDefault(); // evita envío normal
+
+            // Ejecutar una vez más el cálculo para asegurar hidden actualizados
+            try {
+                actualizarTodo();
+            } catch (err) {
+                console.warn('Error al forzar actualizar:', err);
+            }
+
+            // Validación mínima: si existe error de cuota, no enviar
+            if (cuotaError && cuotaError.style.display !== 'none') {
+                alert('Corrige la cuota inicial: debe ser al menos el 7.5% del valor de la vivienda.');
+                if (cuotaInputLocal) cuotaInputLocal.focus();
+                return;
+            }
+
+            // Validación: asegurar que monto_financiar y cuota_inicial no estén vacíos
+            const hiddenMf = document.getElementById('hidden_monto_financiar') ? document.getElementById('hidden_monto_financiar').value : "";
+            const hiddenCuota = parseFloat(document.getElementById('cuota_inicial') ? document.getElementById('cuota_inicial').value : 0) || 0;
+            if (hiddenMf === "" || isNaN(parseFloat(hiddenMf))) {
+                alert('El monto a financiar no está calculado. Revisa los datos.');
+                return;
+            }
+            if (hiddenCuota <= 0) {
+                alert('Ingrese una cuota inicial válida.');
+                if (cuotaInputLocal) cuotaInputLocal.focus();
+                return;
+            }
+
+            // Evitar doble envío
+            if (btn) btn.disabled = true;
+            const originalText = btn ? btn.innerHTML : null;
+            if (btn) btn.innerHTML = 'Enviando...';
+
+            try {
+                const formDataForDebug = new FormData(form);
+                console.groupCollapsed('DEBUG FormData a enviar');
+                for (let pair of formDataForDebug.entries()) {
+                    console.log(pair[0]+ ': ' + pair[1]);
+                }
+                console.groupEnd();
+
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    body: formDataForDebug,
+                    credentials: 'same-origin'
+                });
+
+                if (!resp.ok) {
+                    const text = await resp.text().catch(()=>null);
+                    throw new Error('Error en el servidor. ' + (text ? (' Detalle: '+text) : ''));
+                }
+
+                const json = await resp.json().catch(()=>null);
+                if(json && json.success !== true) throw new Error(json.message || 'No fue posible guardar.');
+
+                window.location.href = "../Crud_Viviendas/listar_viviendas.php";
+
+            } catch (err) {
+                console.error(err);
+                alert('Error al enviar el formulario: ' + (err.message || 'Intenta nuevamente.'));
+                if (btn) btn.disabled = false;
+                if (btn && originalText !== null) btn.innerHTML = originalText;
+            }
+        });
+    })();
+
+}); // end DOMContentLoaded wrapper
 </script>
+
 
 </body>
 </html>
