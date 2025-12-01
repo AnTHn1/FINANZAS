@@ -139,7 +139,7 @@ $solicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <th>Correo</th>
                     <th>Vivienda</th>
                     <th>Precio Vivienda (S/)</th>
-                    <th>TNA</th>
+                    <th>TEA</th>
                     <th>Plazo (meses)</th>
                     <th>Periodo de Gracia</th>
                     <th>Fecha Solicitud</th>
